@@ -1,0 +1,24 @@
+{{!-- Page-specific style overrides --}}
+<style type="text/css">
+    .jumbotron {
+        margin-bottom: 0px;
+    }
+</style>
+
+<div class="jumbotron p-a m-t-lg">
+    <h1>
+        Mapper
+    </h1>
+
+    <p class="lead">
+        Here you can map out measurements on floor plans.
+    </p>
+</div>
+
+{{mapper-component 
+    lengths=model 
+    createLength=(action 'createLength') 
+    deleteLength=(action 'deleteLength') 
+    editLengthUnit=(action 'editLengthUnit') 
+    deleteLengths=(action 'deleteLengths')
+}}

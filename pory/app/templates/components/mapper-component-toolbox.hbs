@@ -1,0 +1,123 @@
+<h2 class="text-center m-t">Toolbox</h2>
+
+{{#if toolboxWarning}}
+    <div class="card card-danger">
+        <div class="card-block">
+            <span class="fa fa-warning"></span> {{toolboxWarning}}
+        </div>
+    </div>
+{{/if}}
+
+{{#if mm}}
+    <div class="card">
+        <div class="card-block">
+            <p>
+                <span class="fa fa-exclamation-circle"></span> What to do now:
+            </p>
+
+            <p>
+                You may now take measurements and the length of them will be calculated for you.
+            </p>
+        </div>
+    </div>
+{{else}}
+    <div class="card">
+        <div class="card-block">
+            {{#if initialMeasurementPoint1Taken}}
+                <p>
+                    <strong>Initial Measurement Point #1: </strong><br>
+                    
+                    {{#if initialMeasurementPoint1Taken}}
+                        x: {{initialMeasurementPoint1Coords.x}}, y: {{initialMeasurementPoint1Coords.y}}
+                    {{else}}
+                        none
+                    {{/if}}
+                </p>
+
+                <p>
+                    <strong>Initial Measurement Point #2: </strong><br>
+                    
+                    {{#if initialMeasurementPointsTaken}}
+                        x: {{initialMeasurementPoint2Coords.x}}, y: {{initialMeasurementPoint2Coords.y}}
+                    {{else}}
+                        none
+                    {{/if}}
+                </p>
+
+                {{#if initialMeasurementLength}}
+                    <p>
+                        <strong>Initial Measurement Length: </strong><br>
+                        
+                        <div class="row" style="margin-top: 6px;">
+                            <div class="col-sm-6">
+                                {{input value=actualInitialMeasurement class="form-control" placeholder="Length"}}
+                            </div>
+
+                            <div class="col-sm-6">
+                                <select onchange={{action (mut initialMeasurementUnit) value="target.value"}} class="form-control">
+                                    <option value="mm">Millimetres</option>
+                                    <option value="cm">Centimetres</option>
+                                    <option value="in">Inches</option>
+                                    <option value="ft">Foot</option>
+                                    <option value="yd">Yards</option>
+                                    <option value="m">Metres</option>
+                                </select>
+                            </div>
+                        </div>
+                    </p>
+                {{/if}}
+            {{else}}
+                <p>
+                    <span class="fa fa-exclamation-circle"></span> Before you start:
+                </p>
+
+                <p>
+                    Please take a measurement of something you know the measurement of already by clicking both the start and end point of the measurement.
+                </p>
+            {{/if}}
+        </div>
+    </div>
+
+    <div class="row">
+        {{#if initialMeasurementPoint1Taken}}
+            <div class="col-sm-6">
+                <button {{action 'startOver' on='click'}} class="btn btn-danger btn-block">
+                    <span class="fa fa-refresh"></span> Start Over
+                </button>
+            </div>
+        {{/if}}
+
+        {{#if initialMeasurementPointsTaken}}
+            <div class="col-sm-6">
+                <button {{action 'setRatio' on='click'}} class="btn btn-primary btn-block">
+                    Done
+                </button>
+            </div>
+        {{/if}}
+    </div>
+{{/if}}
+
+{{#if mm}}
+    <div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <td colspan="2" style="border-top: 0px;">
+                        Lengths Taken:
+                    </td>
+                </tr>
+            </thead>
+
+            <tbody>
+                {{#each lengths as |length|}}
+                    {{mapper-component-toolbox-length 
+                        length=length 
+                        tagName='tr' 
+                        deleteLength=(action 'deleteLength') 
+                        editLengthUnit=(action 'editLengthUnit')
+                    }}
+                {{/each}}
+            </tbody>
+        </table>
+    </div>
+{{/if}}

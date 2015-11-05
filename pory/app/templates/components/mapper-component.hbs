@@ -1,0 +1,30 @@
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-8 col-canvas">
+            {{!-- Mouse Coordinates --}}
+            <span class="mouse-coordinates">x: {{mouseX}}, y: {{mouseY}}</span>
+
+            {{!-- Canvas --}}
+            <canvas id="mapperCanvas"></canvas>
+        </div>
+
+        <div class="col-sm-4 col-toolbox">
+            {{!-- Toolbox --}}
+            {{mapper-component-toolbox 
+                initialMeasurementPoint1Coords=initialMeasurementPoint1Coords initialMeasurementPoint1Taken=initialMeasurementPoint1Taken 
+                initialMeasurementPoint2Coords=initialMeasurementPoint2Coords
+                initialMeasurementPointsTaken=initialMeasurementPointsTaken 
+                initialMeasurementLength=initialMeasurementLength 
+                initialMeasurementUnit=initialMeasurementUnit 
+                actualInitialMeasurement=actualInitialMeasurement 
+                toolboxWarning=toolboxWarning 
+                mm=mm 
+                startOver=(action 'startOver') 
+                setRatio=(action 'setRatio') 
+                deleteLength=(action 'deleteLength') 
+                editLengthUnit=(action 'editLengthUnit') 
+                lengths=lengths
+            }}
+        </div>
+    </div>
+</div>

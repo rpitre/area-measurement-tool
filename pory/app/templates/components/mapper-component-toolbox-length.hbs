@@ -1,0 +1,20 @@
+<td style="vertical-align: middle;">
+    {{round-2dp length.unitLength}}
+</td>
+
+<td>
+    <select onchange={{action 'editUnit' on='change' value="target.value"}} class="form-control" value={{length.unit}}>
+        <option value="mm">Millimetres</option>
+        <option value="cm">Centimetres</option>
+        <option value="in">Inches</option>
+        <option value="ft">Foot</option>
+        <option value="yd">Yards</option>
+        <option value="m">Metres</option>
+    </select>
+</td>
+
+<td class="text-right">
+    <button {{action 'deleteLength' on='click'}} class="btn btn-danger-outline">
+        x
+    </button>
+</td>
