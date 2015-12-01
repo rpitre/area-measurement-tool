@@ -1,73 +1,83 @@
 import Ember from 'ember';
 
 export default Ember.Component.extend({
-    canvas: null,
 
-    mouseX: 0,
-    mouseY: 0,
+    geomUtil: Ember.inject.service('geometry-util'),
+    display: Ember.inject.service('display'),
 
-    initialMeasurementPoint1Coords: null,
+    mouseX: Ember.computed.alias('display.mouseX'),
+    mouseY: Ember.computed.alias('display.mouseY'),
+    initialMeasurementPoint1Coords: Ember.computed.alias('display.initialFirstPoint'),
+    initialMeasurementPoint2Coords: Ember.computed.alias('display.initialSecondPoint'),
+    initialMeasurementLength: Ember.computed.alias('display.initialMeasurementLength'),
+    displayWarning: Ember.computed.alias('display.displayWarning'),
+
+    previousSegment: null,
+    invalidSegment: false,
+
     initialMeasurementPoint1Taken: false,
-
-    initialMeasurementPoint2Coords: null,
     initialMeasurementPointsTaken: false,
 
-    initialMeasurementLength: null,
     actualInitialMeasurement: null,
     initialMeasurementUnit: 'mm',
 
-    measurementPoint1Coords: null,
-    measurementPoint1Taken: false,
-
-    measurementPoint2Coords: null,
-    measurementPointsTaken: false,
+    measurementSelection: 'length',
 
     mm: null,
+    s_mm: null,
 
-    lastUnit: 'mm',
+    lastLengthUnit: 'mm',
+    lastAreaUnit: 's_mm',
 
     toolboxWarning: '',
 
+    /*---------- Proprieties to observe ----------------------*/
+    // Any warning sent by the display service if forwarded to the toolboxWaring
+    displayWarningChange: function() {
+        this.set('toolboxWarning', this.get('displayWarning'));
+    }.observes('displayWarning'),
+
+    initialMeasurementPoint1Change:  function() {
+      let point = this.get('initialMeasurementPoint1Coords');
+      if (point) {
+          this.set('initialMeasurementPoint1Taken', true);
+      }
+    }.observes('initialMeasurementPoint1Coords'),
+
+    initialMeasurementPoint2Change:  function() {
+        let point = this.get('initialMeasurementPoint2Coords');
+        if (point) {
+            this.set('initialMeasurementPointsTaken', true);
+        }
+    }.observes('initialMeasurementPoint2Coords'),
+
+    // When user changes the typeof measurements he wants to do, this method
+    // is called. It sets the display event callbacks to the appropriate ones.
+    measurementSelectionChange: function() {
+       // let self = this;
+
+        if (this.get('measurementSelection') === 'length') {
+            this.get('display').setDisplayForLengthMeasurements((pt1, pt2) => this.recordLength(pt1, pt2));
+        } else {
+            this.get('display').setDisplayForAreaMeasurements(polyline => this.recordArea(polyline));
+        }
+    }.observes('measurementSelection'),
+    /*------------------------------------------------------------------------*/
+
     didInsertElement()
     {
-        let canvas = this.get('canvas');
-
-        // If it's not been initialized already initialize the canvas
-        if (! canvas) {
-
-            this.initializeCanvas();
-        }
+        this.initialize();
     },
 
     actions: {
         startOver()
         {
-            // Reset the properties
-            this.set('initialMeasurementPoint1Coords', null);
-            this.set('initialMeasurementPoint2Coords', null);
             this.set('initialMeasurementPoint1Taken', false);
             this.set('initialMeasurementPointsTaken', false);
-            this.set('initialMeasurementLength', null);
             this.set('initialMeasurementUnit', 'mm');
-            this.set('mouseX', 0);
-            this.set('mouseY', 0);
-
-            // Get the canvas
-            let canvas = this.get('canvas');
-
-            // Make sure it's been initialized
-            if (! canvas) {
-                return;
-            }
-
-            // Iterate through all the canvas' objects
-            canvas.forEachObject(function(obj)
-            {
-                // If it's not an image remove it
-                if (obj.type !== 'image') {
-                    canvas.remove(obj).renderAll();
-                }
-            });
+            this.set('measurementSelection', 'length');
+            this.get('display').deleteAllDisplayedMeasurements();
+            this.get('display').startOver();
         },
 
         setRatio()
@@ -143,533 +153,153 @@ export default Ember.Component.extend({
             // Set the length of 1mm
             this.set('mm', mm);
 
+            // Set the area of 1 s_mm (square millimetres)
+            this.set('s_mm', mm * mm);
+
             // Remove any errors
             this.set("toolboxWarning", "");
 
-            // Get the canvas
-            let canvas = this.get('canvas');
-
-            // Iterate through all the canvas' objects
-            canvas.forEachObject(function(obj)
-            {
-                // If it's not an image remove it
-                if (obj.type !== 'image') {
-                    canvas.remove(obj).renderAll();
-                }
-            });
+            this.get('display').deleteAllDisplayedMeasurements();
 
             // Set the last unit
-            this.set('lastUnit', initialMeasurementUnit);
+            this.set('lastLengthUnit', initialMeasurementUnit);
+
+            // The resolution calculation is done, we can now make measurements
+            // This call will setup the display callbacks which depend on the current
+            // measurement type setting (length or area)
+            this.measurementSelectionChange();
+
         },
 
         deleteLength(id)
         {
             // Pass the id up to the controller
-            this.get('deleteLength')(id);
+            this.get('deleteDataLength')(id);
 
-            // Get the canvas
-            let canvas = this.get('canvas');
+            this.get('display').deleteLength(id);
 
-            // Remove the measurement from the canvas
-            canvas.remove(this.getCanvasObject(`${id}_point_1`)).renderAll();
-            canvas.remove(this.getCanvasObject(`${id}_point_2`)).renderAll();
-            canvas.remove(this.getCanvasObject(`${id}_join_line`)).renderAll();
         },
 
         editLengthUnit(data)
         {
             // Pass the data up to the controller
-            this.get('editLengthUnit')(data);
+            this.get('editDataLengthUnit')(data);
 
             // Set the last unit
-            this.set('lastUnit', data.unit);
+            this.set('lastLengthUnit', data.unit);
+        },
+
+        deleteArea(id)
+        {
+          // Pass the id up to the controller
+          this.get('deleteDataArea')(id);
+
+          this.get('display').deleteArea(id);
+        },
+
+        editAreaUnit(data)
+        {
+          // Pass the data up to the controller
+          this.get('editDataAreaUnit')(data);
+
+          // Set the last unit
+          this.set('lastAreaUnit', data.unit);
+        },
+
+        highLightArea(id)
+        {
+            this.get('display').highLightArea(id);
+        },
+
+        highLightLength(id)
+        {
+            this.get('display').highLightLength(id);
+        },
+
+        unLightArea(id)
+        {
+          this.get('display').unLightArea(id);
+        },
+
+        unLightLength(id)
+        {
+            this.get('display').unLightLength(id);
         }
+
     },
 
-    initializeCanvas()
+    initialize()
     {
-        let self = this;
+        this.deleteAllData();
 
-        // Initiate the canvas
-        let canvas = new fabric.Canvas('mapperCanvas');
-
-        // Get the offset of the canvas
-        let canvasOffset = Ember.$('#mapperCanvas').offset().top;
-
-        // Get the height on the window's inner height
-        let innerHeight = window.innerHeight;
-
-        // Calculate the height of the canvas
-        let canvasHeight = innerHeight - canvasOffset;
-
-        // Set the height of the canvas
-        canvas.setHeight(canvasHeight);
-
-        // Set the height of the toolbox
-        Ember.$('.col-toolbox').height(canvasHeight);
-
-        // Get the width of the canvas' column
-        let canvasColumnWidth = Ember.$('.col-canvas').width();
-
-        // Set the width of the canvas
-        canvas.setWidth(canvasColumnWidth);
-
-        // Disable group selection
-        canvas.selection = false;
-
-        // Load the test image
-        fabric.Image.fromURL('images/floorplan.jpg', function(img)
-        {
-            // Scale the image to the height of the canvas
-            img.scaleToHeight(canvas.height);
-
-            // Make it so the user can't interact with or select the image
-            img.evented = img.selectable = false;
-
-            // Set the X origin to the center of the image so we can center it
-            img.originX = 'center';
-
-            // Center the image
-            img.left = canvas.width / 2;
-
-            // Add the image to the canvas and rerender it
-            canvas.add(img).renderAll();
-        });
-
-        // Bind an event to track the position of the cursor on the canvas
-        canvas.on('mouse:move', function(options)
-        {
-            // Get the pointer
-            let pointer = canvas.getPointer(options.e);
-
-            // Set the X position of the mouse
-            self.set('mouseX', pointer.x);
-
-            // Set the Y position of the mouse
-            self.set('mouseY', pointer.y);
-        });
-
-        // Bind an event to track when a user clicks on the canvas
-        canvas.on('mouse:up', function(options)
-        {
-            // Get the length of 1mm
-            let mm = self.get('mm');
-
-            // The length of 1mm is set
-            if (mm) {
-
-                let firstPoint = (self.get('measurementPoint1Taken') === false);
-                let secondPoint = (self.get('measurementPointsTaken') === false);
-
-                // This is our first initial point
-                if (firstPoint) {
-
-                    // Set the first initial measurement point
-                    self.setMeasurementPoint1(options);
-                }
-
-                // This is our second initial point
-                else if (secondPoint) {
-
-                    // Set the second initial measurement point
-                    self.setMeasurementPoint2(options);
-                }
-            }
-
-            // The length of 1mm isn't set yet
-            else {
-
-                let firstPoint = (self.get('initialMeasurementPoint1Taken') === false);
-                let secondPoint = (self.get('initialMeasurementPointsTaken') === false);
-
-                // This is our first initial point
-                if (firstPoint) {
-
-                    // Set the first initial measurement point
-                    self.setInitialMeasurementPoint1(options);
-                }
-
-                // This is our second initial point
-                else if (secondPoint) {
-
-                    // Set the second initial measurement point
-                    self.setInitialMeasurementPoint2(options);
-                }
-            }
-        });
-
-        // Set the default cursor to a crosshair
-        canvas.defaultCursor = 'crosshair';
-
-        // Set the canvas
-        this.set('canvas', canvas);
-
-        // Delete any existing lengths
-        this.deleteLengths();
+        this.get('display').initDisplay();
+        this.get('display').setDisplayForResolutionMeasurement();
     },
 
-    setInitialMeasurementPoint1()
+    recordArea(polyline)
     {
-        let self = this;
+        // Calculate the surface
+        let measurementArea = this.get('geomUtil').calculatePolygonArea(polyline);
 
-        // Get the canvas
-        let canvas = this.get('canvas');
+        // Get the area of 1 square mm
+        let s_mm = this.get('s_mm');
 
-        // Create the point
-        let pointCoords = { 
-            x: self.get('mouseX'),
-            y: self.get('mouseY')
+        // Get the last unit
+        let lastAreaUnit = this.get('lastAreaUnit');
+
+        // Create a data object containing the area's data
+        let data = {
+            poly:  polyline,
+            px: measurementArea,
+            s_mm: measurementArea / s_mm,
+            unit: lastAreaUnit
         };
 
-        // Create a circle at our point
-        let circle = new fabric.Circle({
-            radius: 8,
-            fill: 'white',
-            left: pointCoords.x,
-            top: pointCoords.y,
-            originX: 'center',
-            originY: 'center',
-            stroke: '#0275d8',
-            strokeWidth: 7,
-            reference: 'initialMeasurementPoint1',
-            hasControls: false,
-            selectable: false
-        });
-
-        // Add the circle to the canvas and rerender it
-        canvas.add(circle).renderAll();
-
-        // Animate the circle
-        circle.animate('radius', '+=5', {
-            onChange: canvas.renderAll.bind(canvas),
-            duration: 100,
-            easing: fabric.util.ease.easeInCubic,
-            
-            onComplete: function()
-            {
-                circle.animate('radius', '-=5', {
-                    onChange: canvas.renderAll.bind(canvas),
-                    duration: 150,
-                    easing: fabric.util.ease.easeOutCubic
-                });
-            }
-        });
-
-        // Set the first initial measurements coordinates
-        this.set('initialMeasurementPoint1Coords', pointCoords);
-
-        // Tell the app we've not set our first initial point
-        this.set('initialMeasurementPoint1Taken', true);
+        return this.get('createDataArea')(data);
     },
 
-    setInitialMeasurementPoint2()
+    recordLength(pt1, pt2)
     {
-        let self = this;
-
-        // Get the canvas
-        let canvas = this.get('canvas');
-
-        // Create the point
-        let pointCoords = { 
-            x: self.get('mouseX'),
-            y: self.get('mouseY')
-        };
-
-        // Create a circle at our point
-        let circle = new fabric.Circle({
-            radius: 8,
-            fill: 'white',
-            left: pointCoords.x,
-            top: pointCoords.y,
-            originX: 'center',
-            originY: 'center',
-            stroke: '#0275d8',
-            strokeWidth: 7,
-            reference: 'initialMeasurementPoint2',
-            hasControls: false,
-            selectable: false
-        });
-
-        // Add the circle to the canvas and rerender it
-        canvas.add(circle).renderAll();
-
-        // Animate the circle
-        circle.animate('radius', '+=5', {
-            onChange: canvas.renderAll.bind(canvas),
-            duration: 100,
-            easing: fabric.util.ease.easeInCubic,
-            
-            onComplete: function()
-            {
-                circle.animate('radius', '-=5', {
-                    onChange: canvas.renderAll.bind(canvas),
-                    duration: 150,
-                    easing: fabric.util.ease.easeOutCubic
-                });
-            }
-        });
-
-        // Set the second initial measurements coordinates
-        this.set('initialMeasurementPoint2Coords', pointCoords);
-
-        // Tell the app we've not set our first initial point
-        self.set('initialMeasurementPointsTaken', true);
-
-        // Get the coordinates for our line
-        let lineCoords = [
-            this.get('initialMeasurementPoint1Coords.x'),
-            this.get('initialMeasurementPoint1Coords.y'),
-            this.get('initialMeasurementPoint2Coords.x'),
-            this.get('initialMeasurementPoint2Coords.y')
-        ];
-
-        // Create a line to be drawn between the two points
-        let line = new fabric.Line(lineCoords, {
-            fill: '#5CB85C',
-            stroke: '#5CB85C',
-            strokeWidth: 6,
-            selectable: false,
-            originX: 'center',
-            originY: 'center',
-            reference: 'initialMeasurementJoinLine',
-            hasControls: false
-        });
-
-        // Get the first point
-        let firstPoint = this.getCanvasObject('initialMeasurementPoint1');
-
-        // Get the index of the first point
-        let firstPointIndex = canvas.getObjects().indexOf(firstPoint);
-
-        // Add the line to the canvas and rerender it
-        canvas.add(line).renderAll();
-
-        // Move the line to below the first point
-        line.moveTo(firstPointIndex);
-
-        // Rerender the canvas
-        canvas.renderAll();
-
-        // Calculate the initial measurement length
-        let initialMeasurementLength = Math.sqrt(
-            Math.pow(line.x2 - line.x1, 2) + Math.pow(line.y1 - line.y2, 2)
-        );
-
-        // Set the initial measurement length
-        this.set('initialMeasurementLength', initialMeasurementLength);
-    },
-
-    setMeasurementPoint1()
-    {
-        let self = this;
-
-        // Get the canvas
-        let canvas = this.get('canvas');
-
-        // Create the point
-        let pointCoords = { 
-            x: self.get('mouseX'),
-            y: self.get('mouseY')
-        };
-
-        // Create a circle at our point
-        let circle = new fabric.Circle({
-            radius: 8,
-            fill: 'white',
-            left: pointCoords.x,
-            top: pointCoords.y,
-            originX: 'center',
-            originY: 'center',
-            stroke: '#0275d8',
-            strokeWidth: 7,
-            reference: 'measurementPoint1',
-            hasControls: false,
-            selectable: false
-        });
-
-        // Add the circle to the canvas and rerender it
-        canvas.add(circle).renderAll();
-
-        // Animate the circle
-        circle.animate('radius', '+=5', {
-            onChange: canvas.renderAll.bind(canvas),
-            duration: 100,
-            easing: fabric.util.ease.easeInCubic,
-            
-            onComplete: function()
-            {
-                circle.animate('radius', '-=5', {
-                    onChange: canvas.renderAll.bind(canvas),
-                    duration: 150,
-                    easing: fabric.util.ease.easeOutCubic
-                });
-            }
-        });
-
-        // Set the first measurements coordinates
-        this.set('measurementPoint1Coords', pointCoords);
-
-        // Tell the app we've not set our first point
-        this.set('measurementPoint1Taken', true);
-    },
-
-    setMeasurementPoint2()
-    {
-        let self = this;
-
-        // Get the canvas
-        let canvas = this.get('canvas');
-
-        // Create the point
-        let pointCoords = { 
-            x: self.get('mouseX'),
-            y: self.get('mouseY')
-        };
-
-        // Create a circle at our point
-        let circle = new fabric.Circle({
-            radius: 8,
-            fill: 'white',
-            left: pointCoords.x,
-            top: pointCoords.y,
-            originX: 'center',
-            originY: 'center',
-            stroke: '#0275d8',
-            strokeWidth: 7,
-            reference: 'measurementPoint2',
-            hasControls: false,
-            selectable: false
-        });
-
-        // Add the circle to the canvas and rerender it
-        canvas.add(circle).renderAll();
-
-        // Animate the circle
-        circle.animate('radius', '+=5', {
-            onChange: canvas.renderAll.bind(canvas),
-            duration: 100,
-            easing: fabric.util.ease.easeInCubic,
-            
-            onComplete: function()
-            {
-                circle.animate('radius', '-=5', {
-                    onChange: canvas.renderAll.bind(canvas),
-                    duration: 150,
-                    easing: fabric.util.ease.easeOutCubic
-                });
-            }
-        });
-
-        // Set the second measurements coordinates
-        this.set('measurementPoint2Coords', pointCoords);
-
-        // Tell the app we've not set our first point
-        this.set('measurementPointsTaken', true);
-
-        // Get the coordinates for our line
-        let lineCoords = [
-            this.get('measurementPoint1Coords.x'),
-            this.get('measurementPoint1Coords.y'),
-            this.get('measurementPoint2Coords.x'),
-            this.get('measurementPoint2Coords.y')
-        ];
-
-        // Create a line to be drawn between the two points
-        let line = new fabric.Line(lineCoords, {
-            fill: '#5CB85C',
-            stroke: '#5CB85C',
-            strokeWidth: 6,
-            selectable: false,
-            originX: 'center',
-            originY: 'center',
-            reference: 'measurementJoinLine',
-            hasControls: false
-        });
-
-        // Get the first point
-        let firstPoint = this.getCanvasObject('measurementPoint1');
-
-        // Get the index of the first point
-        let firstPointIndex = canvas.getObjects().indexOf(firstPoint);
-
-        // Add the line to the canvas and rerender it
-        canvas.add(line).renderAll();
-
-        // Move the line to below the first point
-        line.moveTo(firstPointIndex);
-
-        // Rerender the canvas
-        canvas.renderAll();
-
         // Calculate the measurement length
         let measurementLength = Math.sqrt(
-            Math.pow(line.x2 - line.x1, 2) + Math.pow(line.y1 - line.y2, 2)
+            Math.pow(pt1.x - pt2.x, 2) + Math.pow(pt1.y - pt2.y, 2)
         );
-
-        // Set the measurement length
-        this.set('measurementLength', measurementLength);
 
         // Get the length of 1mm
         let mm = this.get('mm');
 
         // Get the last unit
-        let lastUnit = this.get('lastUnit');
+        let lastLengthUnit = this.get('lastLengthUnit');
 
         // Create a data object containing the length's data
         let data = {
-            x1: this.get('measurementPoint1Coords.x'),
-            y1: this.get('measurementPoint1Coords.y'),
-            x2: this.get('measurementPoint2Coords.x'),
-            y2: this.get('measurementPoint2Coords.y'),
+            x1: pt1.x,
+            y1: pt1.y,
+            x2: pt2.x,
+            y2: pt2.y,
             px: measurementLength,
             mm: measurementLength / mm,
-            unit: lastUnit
+            unit: lastLengthUnit
         };
 
-        // Create the length
-        this.get('createLength')(data).then(function(length)
-        {   
-            // Set the reference of our points and like to that of our ID
-            firstPoint.reference = `${length.id}_point_1`;
-            circle.reference = `${length.id}_point_2`;
-            line.reference = `${length.id}_join_line`;
-        });
-
-        // Reset the properties
-        this.set('measurementPoint1Coords', null);
-        this.set('measurementPoint2Coords', null);
-        this.set('measurementPoint1Taken', false);
-        this.set('measurementPointsTaken', false);
-        this.set('measurementLength', null);
+        return this.get('createDataLength')(data);
     },
 
-    getCanvasObject(reference)
-    {
-        let object = null;
-
-        // Get the canvas
-        let canvas = this.get('canvas');
-
-        // Make sure it's been initialized
-        if (! canvas) {
-            return object;
-        }
-
-        // Iterate through all the canvas' objects
-        canvas.forEachObject(function(obj)
-        {
-            // We've found the object we were looking for
-            if (obj.reference === reference) {
-                object = obj;
-            }
-        });
-
-        return object;
-    },
-
-    deleteLengths()
+    deleteDataLengths()
     {
         // Pass it up to the controller
-        this.get('deleteLengths')();
+        this.get('deleteDataLengths')();
+    },
+
+    deleteDataAreas()
+    {
+      // Pass it up to the controller
+      this.get('deleteDataAreas')();
+    },
+
+    deleteAllData()
+    {
+        this.deleteDataLengths();
+        this.deleteDataAreas();
     }
 });

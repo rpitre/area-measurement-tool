@@ -10,20 +10,27 @@
 
         <div class="col-sm-4 col-toolbox">
             {{!-- Toolbox --}}
-            {{mapper-component-toolbox 
-                initialMeasurementPoint1Coords=initialMeasurementPoint1Coords initialMeasurementPoint1Taken=initialMeasurementPoint1Taken 
+            {{mapper-component-toolbox
+                initialMeasurementPoint1Coords=initialMeasurementPoint1Coords initialMeasurementPoint1Taken=initialMeasurementPoint1Taken
                 initialMeasurementPoint2Coords=initialMeasurementPoint2Coords
-                initialMeasurementPointsTaken=initialMeasurementPointsTaken 
-                initialMeasurementLength=initialMeasurementLength 
-                initialMeasurementUnit=initialMeasurementUnit 
-                actualInitialMeasurement=actualInitialMeasurement 
-                toolboxWarning=toolboxWarning 
-                mm=mm 
-                startOver=(action 'startOver') 
-                setRatio=(action 'setRatio') 
-                deleteLength=(action 'deleteLength') 
-                editLengthUnit=(action 'editLengthUnit') 
-                lengths=lengths
+                initialMeasurementPointsTaken=initialMeasurementPointsTaken
+                initialMeasurementLength=initialMeasurementLength
+                initialMeasurementUnit=initialMeasurementUnit
+                actualInitialMeasurement=actualInitialMeasurement
+                toolboxWarning=toolboxWarning
+                mm=mm
+                startOver=(action 'startOver')
+                setRatio=(action 'setRatio')
+                deleteLength=(action 'deleteLength')
+                editLengthUnit=(action 'editLengthUnit')
+                highLightLength=(action 'highLightLength')
+                unLightLength=(action 'unLightLength')
+                deleteArea=(action 'deleteArea')
+                editAreaUnit=(action 'editAreaUnit')
+                highLightArea=(action 'highLightArea')
+                unLightArea=(action 'unLightArea')
+                measurements=measurements
+                measurementSelection=measurementSelection
             }}
         </div>
     </div>

@@ -16,8 +16,36 @@
             </p>
 
             <p>
-                You may now take measurements and the length of them will be calculated for you.
+                You may now take measurements and the value (length or area) of them will be calculated for you.
             </p>
+            <div>
+                Please select the type of measurements you want to make (you can switch type anytime):
+              <p>
+                <p>
+
+                </p>
+                  {{#labeled-radio-button
+                      radioId='lengthId'
+                      radioClass='measurementType-class'
+                      groupValue=(mut measurementSelection)
+                      value='length'
+                      name='measurementType'
+                  }}
+                    Length
+                  {{/labeled-radio-button}}
+
+                  {{#labeled-radio-button
+                      radioId='areaId'
+                      radioClass='measurementType-class'
+                      groupValue=(mut measurementSelection)
+                      value='area'
+                      name='measurementType'
+                  }}
+                    Area
+                  {{/labeled-radio-button}}
+              </p>
+
+            </div>
         </div>
     </div>
 {{else}}
@@ -26,7 +54,7 @@
             {{#if initialMeasurementPoint1Taken}}
                 <p>
                     <strong>Initial Measurement Point #1: </strong><br>
-                    
+
                     {{#if initialMeasurementPoint1Taken}}
                         x: {{initialMeasurementPoint1Coords.x}}, y: {{initialMeasurementPoint1Coords.y}}
                     {{else}}
@@ -36,7 +64,7 @@
 
                 <p>
                     <strong>Initial Measurement Point #2: </strong><br>
-                    
+
                     {{#if initialMeasurementPointsTaken}}
                         x: {{initialMeasurementPoint2Coords.x}}, y: {{initialMeasurementPoint2Coords.y}}
                     {{else}}
@@ -47,7 +75,7 @@
                 {{#if initialMeasurementLength}}
                     <p>
                         <strong>Initial Measurement Length: </strong><br>
-                        
+
                         <div class="row" style="margin-top: 6px;">
                             <div class="col-sm-6">
                                 {{input value=actualInitialMeasurement class="form-control" placeholder="Length"}}
@@ -103,18 +131,28 @@
             <thead>
                 <tr>
                     <td colspan="2" style="border-top: 0px;">
-                        Lengths Taken:
+                        Measurements Taken:
                     </td>
                 </tr>
             </thead>
 
             <tbody>
-                {{#each lengths as |length|}}
-                    {{mapper-component-toolbox-length 
-                        length=length 
-                        tagName='tr' 
-                        deleteLength=(action 'deleteLength') 
+                {{#each measurements.lengths as |length|}}
+                    {{mapper-component-toolbox-length
+                        length=length
+                        deleteLength=(action 'deleteLength')
                         editLengthUnit=(action 'editLengthUnit')
+                        highLightLength=(action 'highLightLength')
+                        unLightLength=(action 'unLightLength')
+                    }}
+                {{/each}}
+                {{#each measurements.areas as |area|}}
+                    {{mapper-component-toolbox-area
+                        area=area
+                        deleteArea=(action 'deleteArea')
+                        editAreaUnit=(action 'editAreaUnit')
+                        highLightArea=(action 'highLightArea')
+                        unLightArea=(action 'unLightArea')
                     }}
                 {{/each}}
             </tbody>

@@ -39,6 +39,7 @@
     "ember-disable-proxy-controllers": "^1.0.0",
     "ember-export-application-global": "^1.0.3",
     "ember-pouch": "2.0.3",
+    "ember-radio-button": "1.0.7",
     "nw": "0.12.3"
   },
   "main": "dist/index.html",

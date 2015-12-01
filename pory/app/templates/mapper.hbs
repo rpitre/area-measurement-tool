@@ -15,10 +15,14 @@
     </p>
 </div>
 
-{{mapper-component 
-    lengths=model 
-    createLength=(action 'createLength') 
-    deleteLength=(action 'deleteLength') 
-    editLengthUnit=(action 'editLengthUnit') 
-    deleteLengths=(action 'deleteLengths')
+{{mapper-component
+    measurements=model
+    createDataLength=(action 'createDataLength')
+    deleteDataLength=(action 'deleteDataLength')
+    editDataLengthUnit=(action 'editDataLengthUnit')
+    deleteDataLengths=(action 'deleteDataLengths')
+    createDataArea=(action 'createDataArea')
+    deleteDataArea=(action 'deleteDataArea')
+    editDataAreaUnit=(action 'editDataAreaUnit')
+    deleteDataAreas=(action 'deleteDataAreas')
 }}

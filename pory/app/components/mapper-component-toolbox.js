@@ -24,6 +24,39 @@ export default Ember.Component.extend({
         {
             // Pass the data up to the controller
             this.get('editLengthUnit')(data);
+        },
+
+        highLightLength(id)
+        {
+            this.get('highLightLength')(id);
+        },
+
+        unLightLength(id)
+        {
+            this.get('unLightLength')(id);
+        },
+
+        deleteArea(id)
+        {
+            // Pass the id up to the controller
+            this.get('deleteArea')(id);
+        },
+
+        editAreaUnit(data)
+        {
+          // Pass the data up to the controller
+            this.get('editAreaUnit')(data);
+        },
+
+        highLightArea(id)
+        {
+            this.get('highLightArea')(id);
+        },
+
+        unLightArea(id)
+        {
+            this.get('unLightArea')(id);
         }
+
     }
 });

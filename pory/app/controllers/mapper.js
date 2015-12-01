@@ -2,9 +2,8 @@ import Ember from 'ember';
 
 export default Ember.Controller.extend({
     actions: {
-        createLength(data)
+        createDataLength(data)
         {
-            // Create the length
             let length = this.store.createRecord('length', {
                 x1: data.x1,
                 y1: data.y1,
@@ -19,38 +18,75 @@ export default Ember.Controller.extend({
             return length.save();
         },
 
-        deleteLength(id)
+        createDataArea(data)
         {
-            // Find the length
-            this.store.findRecord('length', id).then(function(length)
-            {
-                // Destroy the record
+
+            // Clone the data, it seems that the store
+            // keeps reference to its data.
+            let tmpArray = data.poly.map(obj => {
+                let newObj = {};
+                newObj.x = obj.x;
+                newObj.y = obj.y;
+                return newObj;
+            });
+
+            let area = this.store.createRecord('area', {
+                poly: tmpArray,
+                px: data.px,
+                s_mm: data.s_mm,
+                unit: data.unit
+             });
+
+            // Save and return the created area
+            return area.save();
+        },
+
+        deleteDataLength(id)
+        {
+            this.store.findRecord('length', id).then(length => {
                 length.destroyRecord();
             });
         },
 
-        editLengthUnit(data)
+        deleteDataArea(id)
         {
-            // Find the length
-            this.store.findRecord('length', data.id).then(function(length)
-            {
-                // Update the length
-                length.set("unit", data.unit);
+              this.store.findRecord('area', id).then(area => {
+                  area.destroyRecord();
+              });
+        },
 
-                // Save the length
+         editDataLengthUnit(data)
+        {
+            this.store.findRecord('length', data.id).then(length => {
+                length.set("unit", data.unit);
                 length.save();
             });
         },
 
-        deleteLengths()
+        editDataAreaUnit(data)
+        {
+            // Find the area
+            this.store.findRecord('area', data.id).then(area => {
+                area.set("unit", data.unit);
+                area.save();
+            });
+        },
+
+        deleteDataLengths()
         {
             // Find and destroy all the records
-            this.store.findAll('length').then(function(lengths)
-            {
-                // Iterate through all lengths
-                lengths.toArray().forEach(function(length)
-                {
+            this.store.findAll('length').then(lengths => {
+                lengths.toArray().forEach(length => {
                     length.destroyRecord();
+                });
+            });
+        },
+
+        deleteDataAreas()
+        {
+            this.store.findAll('area').then(areas => {
+                areas.toArray().forEach(area => {
+                    area.destroyRecord();
                 });
             });
         }
