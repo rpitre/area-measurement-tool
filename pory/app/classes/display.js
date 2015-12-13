@@ -1,9 +1,6 @@
 import Ember from 'ember';
 
-export default Ember.Service.extend({
-
-    geomUtil: Ember.inject.service('geometry-util'),
-
+export default Ember.Object.extend({
     canvas: null,
     mouseIsDown: false,
     widgetColor: '#5CB85C',
@@ -12,7 +9,7 @@ export default Ember.Service.extend({
     polyFillColor: 'yellow',
 
     // List of vertex that defines a polygone contour
-    areaPoints: Ember.A(),
+    areaPoints: [],
 
     // This value is used to create a circle around selected points.
     // It is also use to determine is a point is near an another point
@@ -37,47 +34,45 @@ export default Ember.Service.extend({
     // if the current segment self-intersect the polygone contour
     incorrectSegment: false,
 
-    initDisplay()
+    init()
     {
-        if (!this.get('canvas')) {
-            let canvas = new fabric.Canvas('mapperCanvas');
+        this._super(...arguments);
 
-            let canvasOffset = Ember.$('#mapperCanvas').offset().top;
+        this.canvas = new fabric.Canvas('mapperCanvas');
 
-            let innerHeight = window.innerHeight;
+        let canvasOffset = Ember.$('#mapperCanvas').offset().top;
 
-            let canvasHeight = innerHeight - canvasOffset;
+        let innerHeight = window.innerHeight;
 
-            canvas.setHeight(canvasHeight);
+        let canvasHeight = innerHeight - canvasOffset;
 
-            // Set the height of the toolbox
-            Ember.$('.col-toolbox').height(canvasHeight);
+        this.canvas.setHeight(canvasHeight);
 
-            let canvasColumnWidth = Ember.$('.col-canvas').width();
+        // Set the height of the toolbox
+        Ember.$('.col-toolbox').height(canvasHeight);
 
-            canvas.setWidth(canvasColumnWidth);
+        let canvasColumnWidth = Ember.$('.col-canvas').width();
 
-            canvas.selection = false;
+        this.canvas.setWidth(canvasColumnWidth);
 
-            // Load the test image
-            fabric.Image.fromURL('images/floorplan.jpg', function (img) {
-                img.scaleToHeight(canvas.height);
+        this.canvas.selection = false;
 
-                // Make it so the user can't interact with or select the image
-                img.evented = img.selectable = false;
+        let self = this;
+        // Load the test image
+        fabric.Image.fromURL('images/floorplan.jpg', function (img) {
+            img.scaleToHeight(self.canvas.height);
 
-                // Set the X origin to the center of the image so we can center it
-                img.originX = 'center';
-                img.left = canvas.width / 2;
+            // Make it so the user can't interact with or select the image
+            img.evented = img.selectable = false;
 
-                canvas.add(img).renderAll();
-            });
+            // Set the X origin to the center of the image so we can center it
+            img.originX = 'center';
+            img.left = self.canvas.width / 2;
 
-            canvas.defaultCursor = 'crosshair';
+            self.canvas.add(img).renderAll();
+      });
 
-            this.set('canvas', canvas);
-        }
-
+      this.canvas.defaultCursor = 'crosshair';
     },
 
     startOver()
@@ -90,6 +85,124 @@ export default Ember.Service.extend({
 
     },
 
+  /*-------------------  Geometry util --------------*/
+    // Returns true is point is within epsilon distance from (x,y), false otherwise
+    isNearEnough: function(point, x ,y, epsilon) {
+        return (point.x - x) * (point.x - x)  + (point.y - y) * (point.y - y) < epsilon*epsilon;
+    },
+
+    // Test intersection of segment p1p2 and p3p4
+    // Returns true if they do intersect, false if they don't
+    // We use standerd line equation: ax + by +c = 0
+    segmentIntersects(p1, p2, p3, p4) {
+
+        // Line equation , segment  p1p2
+        let a1 = p2.y - p1.y;
+        let b1 = p1.x - p2.x;
+        let c1 = p2.x * p1.y - p1.x * p2.y;
+
+        // Compute the line sign values
+        let r1 = a1 * p3.x + b1 * p3.y + c1;
+        let r2 = a1 * p4.x + b1 * p4.y + c1;
+
+        if  (r1 !== 0 && r2 !== 0 && ((r1 > 0) === (r2>0))) {
+            return false;
+        }
+
+        //Line equation , segment  p3p4
+        let a2 = p4.y - p3.y;
+        let b2 = p3.x - p4.x;
+        let c2 = p4.x * p3.y - p3.x * p4.y;
+
+        // Compute the line sign values
+        r1 = a2 * p1.x + b2 * p1.y + c2;
+        r2 = a2 * p2.x + b2 * p2.y + c2;
+
+        if  (r1 !== 0 && r2 !== 0 && ((r1 > 0) === (r2>0))) {
+            return false;
+        }
+
+        if  ( (a1 * b2 - a2 * b1) === 0) {
+          // The segments are collinear, they intersect if they overlap
+          // They overlap is p4 falls on p1p2 or if p2 falls on p3p4
+          if (this.isOnSegment(p1, p2, p4) || this.isOnSegment(p3, p4, p2)) {
+              return true;
+          } else {
+              return false;
+          }
+        } else {
+
+            return true;
+
+        }
+    },
+
+    // The polyline is a list of vertices, each one  defined as (x:x,y:y}
+    // Does a segment  to be added at the end off the polyline creates
+    // a self-intersection polyline? It will return true if it does.
+    // p2 is the end vertex of the segment we want to add and its start
+    // vertex is last vertex of the polyline.
+    doesSegmentIntersectPolyline(polyline, p2) {
+
+        // We need at least one edge
+        if ( polyline.length < 2) {
+            return false;
+        }
+
+        let polylineLength = polyline.length;
+
+        let doIntersect = false;
+        let lastPoint = polyline[polylineLength -1];
+
+        // First we need to test against all the polyline segment except the last one
+        for (let idx = 0; idx < polylineLength - 2; idx++) {
+            if (this.segmentIntersects(polyline[idx], polyline[idx + 1], lastPoint, p2) === true) {
+            doIntersect = true;
+            break;
+          }
+        }
+
+        if (!doIntersect) {
+            // We now test against the last polyline segment.
+            // Since the fast segement and the segement we want to
+            // add share a vertex, theoretically they do intersect.
+            // But it is not considered a self-intersection.
+            // We do self-intersect the last polyline segment if we backtrack
+            // on it. We backtrack on it if p2 falls on the last segment of the
+            // polyline
+            if (this.isOnSegment(polyline[polylineLength - 2], lastPoint, p2)) {
+                doIntersect = true;
+            }
+        }
+
+        return doIntersect;
+    },
+    // Returns true is p3 is on segment p1p2
+    isOnSegment(p1,p2,p3) {
+        // For p3 to be on segment p1p2 , segments p1p3 and p3p2 must be collinear
+        let crossProduct = (p3.y - p1.y) * (p2.x - p1.x) - (p3.x - p1.x) * (p2.y - p1.y);
+        if ( crossProduct !== 0) {
+            // They are not collinear
+            return false;
+        }
+
+        // A collinear point falls on a segment if the dotProduct is
+        // positive and if it is less than the squared length of the
+        // segment
+        let dotProduct = (p3.x - p1.x) * (p2.x - p1.x) + (p3.y - p1.y) * (p2.y - p1.y);
+
+        if (dotProduct < 0) {
+            return false;
+        }
+
+        let squaredLengthP1P2 = (p2.x - p1.x) * (p2.x - p1.x) + (p2.y - p1.y) * (p2.y - p1.y);
+
+        if ( dotProduct > squaredLengthP1P2) {
+            return false;
+        }
+        return true;
+    },
+    /*--------------------------------------------------------------------------------------*/
     createCircle(x, y, reference)
     {
         return new fabric.Circle({
@@ -152,8 +265,7 @@ export default Ember.Service.extend({
             duration: 100,
             easing: fabric.util.ease.easeInCubic,
 
-            onComplete: function()
-            {
+            onComplete: function() {
                 circle.animate('radius', '-=5', {
                     onChange: canvas.renderAll.bind(canvas),
                     duration: 150,
@@ -168,10 +280,6 @@ export default Ember.Service.extend({
     // Use to get rid of unfinished area
     cleanDisplay(canvas) {
 
-        if (!canvas) {
-          return;
-        }
-
         // We need to remove unfinished area objects, if any
         let objs = this.getCanvasObjects('areaRef-circle');
         objs.map(obj => canvas.remove(obj));
@@ -181,22 +289,20 @@ export default Ember.Service.extend({
 
         this.set('firstPoint', null);
         this.set('secondPoint', null);
-        this.get('areaPoints').clear();
+        this.get('areaPoints').length = 0;
     },
 
     // Delete all objects in the canvas
     deleteAllDisplayedMeasurements()
     {
         let canvas = this.get('canvas');
-        if (!canvas) {
-          return;
-        }
+
         canvas.forEachObject(function(obj)
         {
             // If it's not an image then it is a measurement, remove it
             if (obj.type !== 'image') {
-                canvas.remove(obj).renderAll();
-          }
+               canvas.remove(obj).renderAll();
+            }
         });
     },
 
@@ -206,15 +312,9 @@ export default Ember.Service.extend({
 
         let canvas = this.get('canvas');
 
-        if (! canvas) {
-            return object;
-        }
-
-        canvas.forEachObject(function(obj)
-        {
-            // We've found the object we were looking for
+        canvas.forEachObject(function(obj) {
             if (obj.reference === reference) {
-                object = obj;
+               object = obj;
             }
         });
 
@@ -227,29 +327,23 @@ export default Ember.Service.extend({
         let object = [];
 
         let canvas = this.get('canvas');
-        if (! canvas) {
-            return object;
-        }
 
         canvas.forEachObject(function(obj)
         {
             if (obj.reference === reference) {
-                object.push(obj);
+              object.push(obj);
             }
         });
 
         return object;
     },
 
-  /*---------------------- Initial Measurement ----------------------------------------*/
+    /*---------------------- Initial Measurement ----------------------------------------*/
     // This sets the canvas to get the initial line that will be use to calculate the
     // display resolution
     setDisplayForResolutionMeasurement()
     {
         let canvas = this.get('canvas');
-        if (!canvas) {
-          return;
-        }
 
         this.resetCanvasMouseEventListener(canvas);
         canvas.on({
@@ -314,7 +408,7 @@ export default Ember.Service.extend({
         let previousSegment = this.get('previousSegment');
         if (previousSegment) {
             canvas.remove(previousSegment);
-           this.set('previousSegment', null);
+            this.set('previousSegment', null);
         }
 
         this.setMeasurementPoint(
@@ -356,9 +450,6 @@ export default Ember.Service.extend({
         this.set('recordData', recordLength);
 
         let canvas = this.get('canvas');
-        if (!canvas) {
-            return;
-        }
 
         // It is possible that when we switch to length measurements we might have an unfinished
         // area build up, we need to clear it from the display
@@ -397,7 +488,7 @@ export default Ember.Service.extend({
             // Erase the previous segement, if any
             let previousSegment = this.get('previousSegment');
             if (previousSegment) {
-                canvas.remove(previousSegment);
+               canvas.remove(previousSegment);
             }
 
             let x = this.get("mouseX");
@@ -478,10 +569,6 @@ export default Ember.Service.extend({
         // Get the canvas
         let canvas = this.get('canvas');
 
-        if (!canvas) {
-            return;
-        }
-
         // Remove the measurement from the canvas
         canvas.remove(this.getCanvasObject(`${id}_point_1`)).renderAll();
         canvas.remove(this.getCanvasObject(`${id}_point_2`)).renderAll();
@@ -491,10 +578,6 @@ export default Ember.Service.extend({
     unLightLength(id)
     {
         let canvas = this.get('canvas');
-
-        if (!canvas) {
-            return;
-        }
 
         let widgetColor = this.get('widgetColor');
 
@@ -517,10 +600,6 @@ export default Ember.Service.extend({
     highLightLength(id)
     {
         let canvas = this.get('canvas');
-
-        if (!canvas) {
-            return;
-        }
 
         let highlightColor = this.get('highlightColor');
 
@@ -549,9 +628,6 @@ export default Ember.Service.extend({
         this.set('incorrectSegment', false);
 
         let canvas = this.get('canvas');
-        if (!canvas) {
-            return;
-        }
 
         this.resetCanvasMouseEventListener(canvas);
         canvas.on({
@@ -580,7 +656,7 @@ export default Ember.Service.extend({
                 options
             );
 
-            this.get('areaPoints').pushObject({'x':x, 'y':y});
+            this.get('areaPoints').push({'x':x, 'y':y});
         }
 
     },
@@ -609,15 +685,16 @@ export default Ember.Service.extend({
             let firstVertex = polyline[0];
 
             // Check to see if the current position could close the polygon
-            let willClosePolygon = this.get('geomUtil').isNearEnough(firstVertex, x, y, this.get('circleRadius'));
+            //let willClosePolygon = this.get('geomUtil').isNearEnough(firstVertex, x, y, this.get('circleRadius'));
+            let willClosePolygon = this.isNearEnough(firstVertex, x, y, this.get('circleRadius'));
 
             let lineStrokeColor = this.get('widgetColor');
 
             // Self intersecting polygon is not allowed
             if (!willClosePolygon &&
                 polyline.length > 2 &&
-                this.get('geomUtil').doesSegmentIntersectPolyline(polyline, {x:x, y:y})) {
-
+                //this.get('geomUtil').doesSegmentIntersectPolyline(polyline, {x:x, y:y})) {
+                this.doesSegmentIntersectPolyline(polyline, {x:x, y:y})) {
                 // So it is a bad segment, warn the user
                 lineStrokeColor = this.get('badSegmentColor');
                 this.set("displayWarning", "Incorrect self-intersecting segment");
@@ -646,7 +723,7 @@ export default Ember.Service.extend({
             canvas.add(line).renderAll();
 
             this.set('previousSegment', line);
-        }
+      }
     },
 
     areaCanvasOnMouseUp(options)
@@ -674,7 +751,8 @@ export default Ember.Service.extend({
         // If we clicked inside the circle of the first point, we close the polygon
         let areaPoints = this.get('areaPoints');
         let firstVertex = areaPoints[0];
-        let closePolygon = this.get('geomUtil').isNearEnough(firstVertex, x, y, this.get('circleRadius'));
+        //let closePolygon = this.get('geomUtil').isNearEnough(firstVertex, x, y, this.get('circleRadius'));
+        let closePolygon = this.isNearEnough(firstVertex, x, y, this.get('circleRadius'));
 
         if  (closePolygon) {
             // snap the last vertex to the first one
@@ -694,7 +772,8 @@ export default Ember.Service.extend({
         this.setLength(canvas, false, 'areaRef-line');
 
         if (!closePolygon) {
-            areaPoints.pushObject({'x':x, 'y':y});
+            areaPoints.push({'x':x, 'y':y});
+
             // Copy point 2 in point 1 so that we can
             // continue building the polygon
             this.set('firstPoint', this.get('secondPoint'));
@@ -707,9 +786,9 @@ export default Ember.Service.extend({
             // Reset everything so that we can begin a new polygon if desired
             this.set('firstPoint', null);
             this.set('secondPoint', null);
-            areaPoints.clear();
+            areaPoints.length = 0;
         }
-      },
+    },
 
     setArea(canvas)
     {
@@ -754,23 +833,15 @@ export default Ember.Service.extend({
     {
         let canvas = this.get('canvas');
 
-        if (!canvas) {
-            return;
-        }
-
-         // Remove the area measurement from the canvas
-         let circles = this.getCanvasObjects(`${id}_circle`);
-         circles.map(circle => canvas.remove(circle).renderAll());
-         canvas.remove(this.getCanvasObject(`${id}_poly`)).renderAll();
+        // Remove the area measurement from the canvas
+        let circles = this.getCanvasObjects(`${id}_circle`);
+        circles.map(circle => canvas.remove(circle).renderAll());
+        canvas.remove(this.getCanvasObject(`${id}_poly`)).renderAll();
     },
 
     unLightArea(id)
     {
         let canvas = this.get('canvas');
-
-        if (!canvas) {
-            return;
-        }
 
         let circles = this.getCanvasObjects(`${id}_circle`);
         circles.map(circle => circle.stroke = this.get('widgetColor'));
@@ -785,15 +856,11 @@ export default Ember.Service.extend({
     {
         let canvas = this.get('canvas');
 
-        if (!canvas) {
-            return;
-        }
-
         let circles = this.getCanvasObjects(`${id}_circle`);
         circles.map(circle => circle.stroke = this.get('highlightColor'));
         let poly = this.getCanvasObject(`${id}_poly`);
         if (poly) {
-            poly.stroke =  this.get('highlightColor');
+           poly.stroke =  this.get('highlightColor');
         }
         canvas.renderAll();
     }

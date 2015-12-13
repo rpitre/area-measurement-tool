@@ -2,7 +2,7 @@ import DS from 'ember-data';
 import Ember from 'ember';
 
 export default DS.Model.extend({
-    poly: DS.attr('data-array'),
+    poly: DS.attr(),
 
     px: DS.attr('number'),
 

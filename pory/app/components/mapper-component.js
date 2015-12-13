@@ -1,9 +1,9 @@
 import Ember from 'ember';
 
-export default Ember.Component.extend({
+import Display from 'porycore/classes/display';
 
-    geomUtil: Ember.inject.service('geometry-util'),
-    display: Ember.inject.service('display'),
+export default Ember.Component.extend({
+    display: null,
 
     mouseX: Ember.computed.alias('display.mouseX'),
     mouseY: Ember.computed.alias('display.mouseY'),
@@ -33,35 +33,33 @@ export default Ember.Component.extend({
 
     /*---------- Proprieties to observe ----------------------*/
     // Any warning sent by the display service if forwarded to the toolboxWaring
-    displayWarningChange: function() {
+    displayWarningChange: Ember.observer('displayWarning', function() {
         this.set('toolboxWarning', this.get('displayWarning'));
-    }.observes('displayWarning'),
+    }),
 
-    initialMeasurementPoint1Change:  function() {
+    initialMeasurementPoint1Change: Ember.observer('initialMeasurementPoint1Coords', function() {
       let point = this.get('initialMeasurementPoint1Coords');
       if (point) {
           this.set('initialMeasurementPoint1Taken', true);
       }
-    }.observes('initialMeasurementPoint1Coords'),
+    }),
 
-    initialMeasurementPoint2Change:  function() {
+    initialMeasurementPoint2Change:  Ember.observer('initialMeasurementPoint2Coords', function() {
         let point = this.get('initialMeasurementPoint2Coords');
         if (point) {
             this.set('initialMeasurementPointsTaken', true);
         }
-    }.observes('initialMeasurementPoint2Coords'),
+    }),
 
     // When user changes the typeof measurements he wants to do, this method
     // is called. It sets the display event callbacks to the appropriate ones.
-    measurementSelectionChange: function() {
-       // let self = this;
-
+    measurementSelectionChange: Ember.observer('measurementSelection', function() {
         if (this.get('measurementSelection') === 'length') {
-            this.get('display').setDisplayForLengthMeasurements((pt1, pt2) => this.recordLength(pt1, pt2));
+          this.get('display').setDisplayForLengthMeasurements((pt1, pt2) => this.recordLength(pt1, pt2));
         } else {
-            this.get('display').setDisplayForAreaMeasurements(polyline => this.recordArea(polyline));
+          this.get('display').setDisplayForAreaMeasurements(polyline => this.recordArea(polyline));
         }
-    }.observes('measurementSelection'),
+    }),
     /*------------------------------------------------------------------------*/
 
     didInsertElement()
@@ -232,14 +230,44 @@ export default Ember.Component.extend({
     {
         this.deleteAllData();
 
-        this.get('display').initDisplay();
+        this.set('display', Display.create());
+        //this.get('display').initDisplay();
         this.get('display').setDisplayForResolutionMeasurement();
+    },
+
+    // Polyline  defines a none intersecting contour of a polygon.
+    // The polyline is a list of vertices, each one  defined as (x:x,y:y}
+    // The last edge of the polygon is implicit between the first and last vertex
+    // of the polyline
+    // NOTE: this method does not check if polyline is a none intersecting contour
+    //       it assumes that it is.
+    calculatePolygonArea: function(polyline) {
+
+        // We need a minimum of 3 vertex to define a polygone
+        if (polyline.length < 3) {
+            return 0;
+        }
+
+        let area = polyline.reduce(function(acc, value, index, array) {
+            if  (index === 0) {
+                let length = array.length;
+                acc =  acc + array[length -1].x * value.y - array[length -1].y * value.x;
+            } else {
+               acc = acc + array[index -1].x * value.y - array[index -1].y * value.x;
+            }
+            return acc;
+        }, 0);
+
+        area = area / 2.0;
+
+        // Polygone could be clock-wise or anti clock-wise
+        return Math.abs(area);
     },
 
     recordArea(polyline)
     {
         // Calculate the surface
-        let measurementArea = this.get('geomUtil').calculatePolygonArea(polyline);
+        let measurementArea = this.calculatePolygonArea(polyline);
 
         // Get the area of 1 square mm
         let s_mm = this.get('s_mm');
